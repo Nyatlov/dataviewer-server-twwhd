@@ -2,7 +2,7 @@
 
 > **Stream Wii U controller data in real-time over your local network.**
 
-This plugin for the Wii U opens a TCP socket to broadcast controller input (GamePad & Pro Controller) and player state (position, speed, etc.) to an external client such as the Python viewer.
+This plugin for the Wii U opens a TCP socket to broadcast controller input (GamePad & Pro Controller) and player state (position, speed, etc.) to an external client such as the [Python viewer](https://github.com/Nyatlov/dataviewer-client-twwhd).
 
 ---
 
