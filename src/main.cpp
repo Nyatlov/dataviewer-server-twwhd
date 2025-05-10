@@ -16,6 +16,7 @@
 #include <nn/ac.h>
 #include <unistd.h>
 #include <coreinit/memorymap.h>
+#include <coreinit/title.h>
 
 /**
     Mandatory plugin information.
@@ -29,6 +30,10 @@ WUPS_PLUGIN_LICENSE("BSD");
 
 
 #define ENABLE_NIS "enableNIS"
+#define STAGE_ID     ((uint8_t*) 0x109763f0)  // 8-byte array
+#define SPAWN_ID     ((uint8_t*) 0x109763f9)  // 1 byte
+#define ROOM_ID      ((uint8_t*) 0x109763fa)  // 1 byte
+#define STAGE_LAYER  ((uint8_t*) 0x109763fb)  // 1 byte
 
 std::string gamepad_hold;
 VPADVec2D gamepad_lstick;
@@ -51,6 +56,29 @@ WUPS_USE_STORAGE("network_input_server"); // Unique id for the storage api
 
 #define ENABLE_NIS_DEFAULT_VALUE     true
 bool enableNIS                     = ENABLE_NIS_DEFAULT_VALUE;
+
+#define STAGE_ID     ((uint8_t*) 0x109763f0)  // 8-byte array
+#define SPAWN_ID     ((uint8_t*) 0x109763f9)  // 1 byte
+#define ROOM_ID      ((uint8_t*) 0x109763fa)  // 1 byte
+#define STAGE_LAYER  ((uint8_t*) 0x109763fb)  // 1 byte
+
+bool isWWHDRunning()
+{
+    uint64_t valid_ids[] = {
+        0x0005000010143600, // EUR
+        0x0005000010143500, // USA
+        0x0005000010143400, // JPN
+        0x0005000010143599  // Randomizer
+    };
+
+    uint64_t title_id = OSGetTitleID();
+
+    for (auto id : valid_ids) {
+        if (title_id == id) return true;
+    }
+
+    return false;
+}
 
 uint32_t remapProButtons(uint32_t buttons)
 {
@@ -169,14 +197,20 @@ std::string formatInput(std::string rawInputs, VPADVec2D lstick, VPADVec2D rstic
     payload.pop_back();
     payload += "],";
 
+    if (!isWWHDRunning()) {
+        payload += "\"connected\": false, \"error\": \"WWHD not running\"}";
+        payload.insert(0, std::to_string(payload.size()) + "#");
+        return payload;
+    }
+
     float speed = 0.0f;
     float* speed_ptr = nullptr;
     float** base = reinterpret_cast<float**>(0x10989C74);
-    if (OSIsAddressValid(reinterpret_cast<uint32_t>(base))) {
+    if (OSIsAddressValid((uint32_t)base)) {
         uint8_t* base_ptr = reinterpret_cast<uint8_t*>(*base);
-        if (OSIsAddressValid(reinterpret_cast<uint32_t>(base_ptr))) {
+        if (OSIsAddressValid((uint32_t)base_ptr)) {
             speed_ptr = reinterpret_cast<float*>(base_ptr + 0x6938);
-            if (OSIsAddressValid(reinterpret_cast<uint32_t>(speed_ptr))) {
+            if (OSIsAddressValid((uint32_t)speed_ptr)) {
                 speed = *speed_ptr;
             }
         }
@@ -188,15 +222,38 @@ std::string formatInput(std::string rawInputs, VPADVec2D lstick, VPADVec2D rstic
     uint16_t* facing_angle = reinterpret_cast<uint16_t*>(0x1096ef12);
 
     payload += "\"speed\": " + std::to_string(speed) + ",";
-    payload += "\"position\": {\"x\": " + std::to_string(*pos_x) + 
-               ", \"y\": " + std::to_string(*pos_y) + 
-               ", \"z\": " + std::to_string(*pos_z) + "},";
-    payload += "\"facing\": " + std::to_string(*facing_angle) + ",";
-    payload += "\"connected\": true, \"id\": \"Wii U Console\", \"index\": 0, \"mapping\": \"standard\", \"timestamp\": 0.0}";
 
+    if (OSIsAddressValid((uint32_t)pos_x) && OSIsAddressValid((uint32_t)pos_y) &&
+        OSIsAddressValid((uint32_t)pos_z)) {
+        payload += "\"position\": {\"x\": " + std::to_string(*pos_x) + ", \"y\": " +
+                   std::to_string(*pos_y) + ", \"z\": " + std::to_string(*pos_z) + "},";
+    }
+
+    if (OSIsAddressValid((uint32_t)facing_angle)) {
+        payload += "\"facing\": " + std::to_string(*facing_angle) + ",";
+    }
+
+    if (OSIsAddressValid((uint32_t)STAGE_ID)) {
+        char stage[9];
+        memcpy(stage, STAGE_ID, 8);
+        stage[8] = '\0';
+        payload += "\"stage\": \"" + std::string(stage) + "\",";
+    }
+    if (OSIsAddressValid((uint32_t)SPAWN_ID)) {
+        payload += "\"spawn\": " + std::to_string(*SPAWN_ID) + ",";
+    }
+    if (OSIsAddressValid((uint32_t)ROOM_ID)) {
+        payload += "\"room\": " + std::to_string(*ROOM_ID) + ",";
+    }
+    if (OSIsAddressValid((uint32_t)STAGE_LAYER)) {
+        payload += "\"layer\": " + std::to_string(*STAGE_LAYER) + ",";
+    }
+
+    payload += "\"connected\": true, \"id\": \"Wii U Console\", \"index\": 0, \"mapping\": \"standard\", \"timestamp\": 0.0}";
     payload.insert(0, std::to_string(payload.size()) + "#");
     return payload;
 }
+
 
 
 void socket_thread()
@@ -227,7 +284,7 @@ void socket_thread()
         }
         auto buffer = new char[26];
         std::string payload;
-        NotificationModule_AddInfoNotification("OJD Connected!");
+        NotificationModule_AddInfoNotification("Input Viewer Connected!");
         while (1)
         {
             auto len = recv(client_fd, buffer, 26, 0);
@@ -277,7 +334,7 @@ void socket_thread()
             payload = formatInput(hold, lstick, rstick);
             write(client_fd, payload.c_str(), strlen(payload.c_str()));
         }
-        NotificationModule_AddInfoNotification("OJD Disconnected!");
+        NotificationModule_AddInfoNotification("Input Viewer Disconnected!");
         if (client_fd > 0)
         {
             close(client_fd);
