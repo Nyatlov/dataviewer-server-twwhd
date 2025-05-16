@@ -185,7 +185,7 @@ std::string formatInput(std::string rawInputs, VPADVec2D lstick, VPADVec2D rstic
     }
 
     payload += "\"axes\": [" + std::to_string(lstick.x) + "," + std::to_string(-lstick.y) + "," +
-                               std::to_string(rstick.x) + "," + std::to_string(-rstick.y) + "],";
+               std::to_string(rstick.x) + "," + std::to_string(-rstick.y) + "],";
 
     payload += "\"buttons\": [";
     for (int key = 0; key < 16; key++)
@@ -204,15 +204,17 @@ std::string formatInput(std::string rawInputs, VPADVec2D lstick, VPADVec2D rstic
     }
 
     float speed = 0.0f;
+    float potential_speed = 0.0f;
     float* speed_ptr = nullptr;
+    float* potential_speed_ptr = nullptr;
     float** base = reinterpret_cast<float**>(0x10989C74);
     if (OSIsAddressValid((uint32_t)base)) {
         uint8_t* base_ptr = reinterpret_cast<uint8_t*>(*base);
         if (OSIsAddressValid((uint32_t)base_ptr)) {
             speed_ptr = reinterpret_cast<float*>(base_ptr + 0x6938);
-            if (OSIsAddressValid((uint32_t)speed_ptr)) {
-                speed = *speed_ptr;
-            }
+            potential_speed_ptr = reinterpret_cast<float*>(base_ptr + 0x294);
+            if (OSIsAddressValid((uint32_t)speed_ptr)) speed = *speed_ptr;
+            if (OSIsAddressValid((uint32_t)potential_speed_ptr)) potential_speed = *potential_speed_ptr;
         }
     }
 
@@ -220,8 +222,10 @@ std::string formatInput(std::string rawInputs, VPADVec2D lstick, VPADVec2D rstic
     float* pos_y = reinterpret_cast<float*>(0x1096ef50);
     float* pos_z = reinterpret_cast<float*>(0x1096ef4c);
     uint16_t* facing_angle = reinterpret_cast<uint16_t*>(0x1096ef12);
+    uint16_t* speed_angle = reinterpret_cast<uint16_t*>(0x1096ef0a);
 
     payload += "\"speed\": " + std::to_string(speed) + ",";
+    payload += "\"potentialSpeed\": " + std::to_string(potential_speed) + ",";
 
     if (OSIsAddressValid((uint32_t)pos_x) && OSIsAddressValid((uint32_t)pos_y) &&
         OSIsAddressValid((uint32_t)pos_z)) {
@@ -231,6 +235,9 @@ std::string formatInput(std::string rawInputs, VPADVec2D lstick, VPADVec2D rstic
 
     if (OSIsAddressValid((uint32_t)facing_angle)) {
         payload += "\"facing\": " + std::to_string(*facing_angle) + ",";
+    }
+    if (OSIsAddressValid((uint32_t)speed_angle)) {
+        payload += "\"speedAngle\": " + std::to_string(*speed_angle) + ",";
     }
 
     if (OSIsAddressValid((uint32_t)STAGE_ID)) {
@@ -267,7 +274,7 @@ void socket_thread()
         // Configure server address structure
         server_addr.sin_family = AF_INET;
         server_addr.sin_addr.s_addr = INADDR_ANY;
-        server_addr.sin_port = htons(56709);
+        server_addr.sin_port = htons(56710);
 
         // Bind the socket to the port
         bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
