@@ -11,7 +11,7 @@ This plugin for the Wii U opens a TCP socket to broadcast controller input (Game
 - ✅ Captures **button presses** and **analog stick** positions
 - ✅ Broadcasts **Link’s position, speed, facing** and **stage name**
 - ✅ Supports both **GamePad** and **Pro Controller**
-- ✅ Lightweight TCP socket server (port `56709`)
+- ✅ Lightweight TCP socket server (port `56710`)
 - ✅ WUPS-compatible with a built-in config UI
 - ✅ Real-time support for viewers like **OJD** or custom dashboards
 
